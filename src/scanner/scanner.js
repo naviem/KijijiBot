@@ -27,11 +27,18 @@ class Scanner {
 
         console.log(`✅ Scheduled ${searches.length} active searches`);
 
+        // Set up periodic sync to detect changes (every minute)
+        this.syncJob = cron.schedule('* * * * *', async () => {
+            await this.syncSchedules();
+        });
+        this.syncJob.start();
+        console.log('🔄 Auto-sync enabled - changes will be detected automatically');
+
         // Immediately perform a scan for all active searches (if configured)
         if (config.scanner.immediateStart) {
             for (const search of searches) {
                 console.log(`⏩ Performing immediate scan for: ${search.name}`);
-                await this.performSearch(search);
+                await this.performSearch(search.id);
             }
         }
     }
@@ -39,30 +46,49 @@ class Scanner {
     scheduleSearch(search) {
         // Cancel existing job if it exists
         if (this.activeJobs.has(search.id)) {
-            this.activeJobs.get(search.id).stop();
+            const existingJobData = this.activeJobs.get(search.id);
+            existingJobData.job.stop();
         }
 
         // Create cron expression (every X minutes)
         const cronExpression = `*/${search.interval_minutes} * * * *`;
-        
+
         const job = cron.schedule(cronExpression, async () => {
-            console.log(`⏰ Scheduled scan triggered for: ${search.name}`);
-            await this.performSearch(search);
-            console.log(`🕒 Waiting ${search.interval_minutes} minutes for next scan of: ${search.name}`);
+            console.log(`⏰ Scheduled scan triggered for search ID: ${search.id}`);
+            await this.performSearch(search.id);
         }, {
             scheduled: false
         });
 
-        this.activeJobs.set(search.id, job);
+        this.activeJobs.set(search.id, {
+            job,
+            interval: search.interval_minutes,
+            name: search.name
+        });
         job.start();
 
-        console.log(`📅 Scheduled search "${search.name}" to run every ${search.interval_minutes} minutes`);
+        console.log(`📅 Scheduled search "${search.name}" (ID: ${search.id}) to run every ${search.interval_minutes} minutes`);
     }
 
-    async performSearch(search) {
+    async performSearch(searchId) {
         try {
+            // Fetch latest search data from database
+            const searches = await this.db.getSearches();
+            const search = searches.find(s => s.id === searchId);
+
+            if (!search) {
+                console.log(`⚠️ Search ID ${searchId} no longer exists, skipping...`);
+                return;
+            }
+
+            // Check if search is still active
+            if (!search.is_active) {
+                console.log(`⏸️ Search "${search.name}" is paused, skipping scan...`);
+                return;
+            }
+
             console.log(`🔍 Performing search: ${search.name} (${search.keyword || 'All'} in ${search.region_name})`);
-            
+
             // Build search URL using selected category and radius
             const searchUrl = this.kijijiService.buildSearchUrl(
                 search.region_url,
@@ -70,10 +96,10 @@ class Scanner {
                 search.category,
                 search.radius || 50.0
             );
-            
+
             // Fetch listings
             const result = await this.kijijiService.searchListings(searchUrl);
-            
+
             if (!result.success) {
                 console.error(`❌ Failed to fetch listings for ${search.name}:`, result.error);
                 return;
@@ -204,7 +230,8 @@ class Scanner {
         try {
             // Stop the cron job
             if (this.activeJobs.has(searchId)) {
-                this.activeJobs.get(searchId).stop();
+                const jobData = this.activeJobs.get(searchId);
+                jobData.job.stop();
                 this.activeJobs.delete(searchId);
             }
 
@@ -218,16 +245,52 @@ class Scanner {
         }
     }
 
+    async syncSchedules() {
+        try {
+            // Get current active searches from database
+            const dbSearches = await this.db.getActiveSearches();
+            const dbSearchIds = new Set(dbSearches.map(s => s.id));
+            const currentJobIds = new Set(this.activeJobs.keys());
+
+            // Find new searches to schedule
+            for (const search of dbSearches) {
+                if (!currentJobIds.has(search.id)) {
+                    console.log(`➕ New search detected: ${search.name}`);
+                    this.scheduleSearch(search);
+                } else {
+                    // Check if interval changed
+                    const jobData = this.activeJobs.get(search.id);
+                    if (jobData.interval !== search.interval_minutes) {
+                        console.log(`🔄 Interval changed for "${search.name}" (${jobData.interval} → ${search.interval_minutes} min), rescheduling...`);
+                        this.scheduleSearch(search);
+                    }
+                }
+            }
+
+            // Find deleted/paused searches to unschedule
+            for (const jobId of currentJobIds) {
+                if (!dbSearchIds.has(jobId)) {
+                    console.log(`➖ Search ID ${jobId} removed or paused, unscheduling...`);
+                    const jobData = this.activeJobs.get(jobId);
+                    jobData.job.stop();
+                    this.activeJobs.delete(jobId);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Error syncing schedules:', error.message);
+        }
+    }
+
     async refreshSchedules() {
         // Stop all current jobs
-        for (const [searchId, job] of this.activeJobs) {
-            job.stop();
+        for (const [searchId, jobData] of this.activeJobs) {
+            jobData.job.stop();
         }
         this.activeJobs.clear();
 
         // Reload and reschedule all active searches
         const searches = await this.db.getActiveSearches();
-        
+
         for (const search of searches) {
             this.scheduleSearch(search);
         }
@@ -241,11 +304,17 @@ class Scanner {
 
     stop() {
         console.log('🛑 Stopping Kijiji Scanner...');
-        
-        for (const [searchId, job] of this.activeJobs) {
-            job.stop();
+
+        // Stop sync job
+        if (this.syncJob) {
+            this.syncJob.stop();
         }
-        
+
+        // Stop all search jobs
+        for (const [searchId, jobData] of this.activeJobs) {
+            jobData.job.stop();
+        }
+
         this.activeJobs.clear();
         this.db.close();
     }

@@ -80,17 +80,33 @@ function displayWebhooks(webhooks) {
         return;
     }
 
-    container.innerHTML = webhooks.map(webhook => `
-        <div class="item-card">
-            <h3>${webhook.name}</h3>
-            <p><strong>URL:</strong> ${webhook.url.substring(0, 40)}...</p>
-            <p><strong>Created:</strong> ${new Date(webhook.created_at).toLocaleDateString()}</p>
-            <div class="item-actions">
-                <button class="btn btn-sm btn-secondary" onclick="testWebhook(${webhook.id})">Test</button>
-                <button class="btn btn-sm btn-danger" onclick="deleteWebhook(${webhook.id})">Delete</button>
-            </div>
+    container.innerHTML = `
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>URL</th>
+                        <th>Created</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${webhooks.map(webhook => `
+                        <tr>
+                            <td>${webhook.name}</td>
+                            <td>${webhook.url.substring(0, 50)}...</td>
+                            <td>${new Date(webhook.created_at).toLocaleDateString()}</td>
+                            <td style="text-align: right;">
+                                <button class="btn btn-sm btn-secondary" onclick="testWebhook(${webhook.id})">Test</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteWebhook(${webhook.id})">Delete</button>
+                            </td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
         </div>
-    `).join('');
+    `;
 }
 
 async function testWebhook(id) {
@@ -149,12 +165,26 @@ function displayRegions(regions) {
         return;
     }
 
-    container.innerHTML = regions.map(region => `
-        <div class="item-card">
-            <h3>${region.name}</h3>
-            <p><strong>Created:</strong> ${new Date(region.created_at).toLocaleDateString()}</p>
+    container.innerHTML = `
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Region Name</th>
+                        <th>Created</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${regions.map(region => `
+                        <tr>
+                            <td>${region.name}</td>
+                            <td>${new Date(region.created_at).toLocaleDateString()}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
         </div>
-    `).join('');
+    `;
 }
 
 // Searches
@@ -187,7 +217,7 @@ async function addSearch() {
 
         const result = await response.json();
         if (result.success) {
-            showToast('Search added successfully! Restart the bot to activate.', 'success');
+            showToast('Search added successfully! It will start automatically within 1 minute.', 'success');
             document.getElementById('searchName').value = '';
             document.getElementById('searchKeyword').value = '';
             document.getElementById('searchInterval').value = '5';
@@ -224,37 +254,58 @@ function displaySearches(searches) {
         return;
     }
 
-    container.innerHTML = searches.map(search => {
-        const status = search.is_active ? 'active' : 'paused';
-        const statusBadge = search.is_active
-            ? '<span class="badge badge-active">Active</span>'
-            : '<span class="badge badge-paused">Paused</span>';
+    container.innerHTML = `
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Region</th>
+                        <th>Keyword</th>
+                        <th>Price Range</th>
+                        <th>Interval</th>
+                        <th>Last Scan</th>
+                        <th>Status</th>
+                        <th style="text-align: right;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${searches.map(search => {
+                        const statusBadge = search.is_active
+                            ? '<span class="badge badge-active">Active</span>'
+                            : '<span class="badge badge-paused">Paused</span>';
 
-        return `
-            <div class="item-card">
-                <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 0.75rem;">
-                    <h3>${search.name}</h3>
-                    ${statusBadge}
-                </div>
-                <p><strong>Keyword:</strong> <span>${search.keyword || 'All in category'}</span></p>
-                <p><strong>Region:</strong> <span>${search.region_name}</span></p>
-                <p><strong>Category:</strong> <span>${search.category || 'All'}</span></p>
-                <p><strong>Webhook:</strong> <span>${search.webhook_name}</span></p>
-                <p><strong>Interval:</strong> <span>${search.interval_minutes} min</span></p>
-                <p><strong>Price:</strong> <span>${search.min_price ? '$' + search.min_price : 'Any'} - ${search.max_price ? '$' + search.max_price : 'Any'}</span></p>
-                <p><strong>Radius:</strong> <span>${search.radius || 50} km</span></p>
-                <p><strong>Duplicates:</strong> <span>${search.no_duplicates ? 'Ignored' : 'Allowed'}</span></p>
-                <p><strong>Last Scan:</strong> <span>${search.last_scan ? new Date(search.last_scan).toLocaleString() : 'Never'}</span></p>
-                <div class="item-actions">
-                    <button class="btn btn-sm btn-secondary" onclick="openEditModal(${search.id})"  >Edit</button>
-                    <button class="btn btn-sm ${search.is_active ? 'btn-secondary' : 'btn-success'}" onclick="toggleSearch(${search.id})">
-                        ${search.is_active ? 'Pause' : 'Resume'}
-                    </button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteSearch(${search.id})">Delete</button>
-                </div>
-            </div>
-        `;
-    }).join('');
+                        const priceRange = search.min_price || search.max_price
+                            ? `${search.min_price ? '$' + search.min_price : 'Any'} - ${search.max_price ? '$' + search.max_price : 'Any'}`
+                            : 'Any';
+
+                        const lastScan = search.last_scan
+                            ? new Date(search.last_scan).toLocaleString()
+                            : 'Never';
+
+                        return `
+                            <tr>
+                                <td><strong>${search.name}</strong></td>
+                                <td>${search.region_name}</td>
+                                <td>${search.keyword || '<span style="color: #858585;">All</span>'}</td>
+                                <td>${priceRange}</td>
+                                <td>${search.interval_minutes} min</td>
+                                <td style="font-size: 0.75rem; color: #858585;">${lastScan}</td>
+                                <td>${statusBadge}</td>
+                                <td style="text-align: right;">
+                                    <button class="btn btn-sm btn-secondary" onclick="openEditModal(${search.id})">Edit</button>
+                                    <button class="btn btn-sm ${search.is_active ? 'btn-secondary' : 'btn-success'}" onclick="toggleSearch(${search.id})">
+                                        ${search.is_active ? 'Pause' : 'Resume'}
+                                    </button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteSearch(${search.id})">Delete</button>
+                                </td>
+                            </tr>
+                        `;
+                    }).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
 }
 
 async function toggleSearch(id) {
@@ -263,7 +314,7 @@ async function toggleSearch(id) {
         const result = await response.json();
 
         if (result.success) {
-            showToast('Search status updated! Restart bot to apply changes.', 'success');
+            showToast('Search status updated! Changes will apply within 1 minute.', 'success');
             loadSearches();
         } else {
             showToast('Error toggling search', 'error');
@@ -408,7 +459,7 @@ async function saveSearch() {
 
         const result = await response.json();
         if (result.success) {
-            showToast('Search updated! Restart bot to apply changes.', 'success');
+            showToast('Search updated! Changes will apply on next scan.', 'success');
             closeEditModal();
             loadSearches();
         } else {
