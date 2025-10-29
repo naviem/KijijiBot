@@ -189,7 +189,6 @@ function displayRegions(regions) {
 
 // Searches
 async function addSearch() {
-    const name = document.getElementById('searchName').value.trim();
     const keyword = document.getElementById('searchKeyword').value.trim();
     const regionId = document.getElementById('searchRegion').value;
     const webhookId = document.getElementById('searchWebhook').value;
@@ -200,10 +199,15 @@ async function addSearch() {
     const noDuplicates = document.getElementById('noDuplicates').checked;
     const radius = document.getElementById('searchRadius').value;
 
-    if (!name || !regionId || !webhookId || !intervalMinutes) {
-        showToast('Please fill in all required fields', 'error');
+    if (!regionId || !webhookId || !intervalMinutes) {
+        showToast('Please select region, webhook, and interval', 'error');
         return;
     }
+
+    // Auto-generate name from keyword and region
+    const regionSelect = document.getElementById('searchRegion');
+    const regionName = regionSelect.options[regionSelect.selectedIndex].text;
+    const name = keyword ? `${keyword} - ${regionName}` : `All - ${regionName}`;
 
     try {
         const response = await fetch('/api/searches', {
@@ -218,7 +222,6 @@ async function addSearch() {
         const result = await response.json();
         if (result.success) {
             showToast('Search added successfully! It will start automatically within 1 minute.', 'success');
-            document.getElementById('searchName').value = '';
             document.getElementById('searchKeyword').value = '';
             document.getElementById('searchInterval').value = '5';
             document.getElementById('minPrice').value = '';
@@ -352,7 +355,6 @@ async function openEditModal(id) {
         if (!search) return;
 
         document.getElementById('editSearchId').value = search.id;
-        document.getElementById('editSearchName').value = search.name;
         document.getElementById('editSearchKeyword').value = search.keyword || '';
         document.getElementById('editSearchInterval').value = search.interval_minutes;
         document.getElementById('editMinPrice').value = search.min_price || '';
@@ -431,7 +433,6 @@ function closeEditModal() {
 
 async function saveSearch() {
     const id = document.getElementById('editSearchId').value;
-    const name = document.getElementById('editSearchName').value.trim();
     const keyword = document.getElementById('editSearchKeyword').value.trim();
     const regionId = document.getElementById('editSearchRegion').value;
     const webhookId = document.getElementById('editSearchWebhook').value;
@@ -442,10 +443,15 @@ async function saveSearch() {
     const noDuplicates = document.getElementById('editNoDuplicates').checked;
     const radius = document.getElementById('editSearchRadius').value;
 
-    if (!name || !regionId || !webhookId || !intervalMinutes) {
-        showToast('Please fill in all required fields', 'error');
+    if (!regionId || !webhookId || !intervalMinutes) {
+        showToast('Please select region, webhook, and interval', 'error');
         return;
     }
+
+    // Auto-generate name from keyword and region
+    const regionSelect = document.getElementById('editSearchRegion');
+    const regionName = regionSelect.options[regionSelect.selectedIndex].text;
+    const name = keyword ? `${keyword} - ${regionName}` : `All - ${regionName}`;
 
     try {
         const response = await fetch(`/api/searches/${id}`, {
