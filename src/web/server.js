@@ -94,13 +94,13 @@ async function startWebServer(sharedServices = {}) {
         }
     });
 
-    app.get('/api/regions/search', async (req, res) => {
+    app.get('/api/regions/search', (req, res) => {
         try {
             const { query } = req.query;
             if (!query) {
                 return res.json({ success: true, data: [] });
             }
-            const results = await kijijiService.searchLocationByName(query);
+            const results = kijijiService.searchLocationByName(query);
             const formattedResults = results.map(region => ({
                 id: region.id,
                 name: region.displayName,
@@ -108,45 +108,6 @@ async function startWebServer(sharedServices = {}) {
                 fullName: region.locationPaths?.map(path => path.name).join(', ') || region.displayName
             }));
             res.json({ success: true, data: formattedResults });
-        } catch (error) {
-            res.status(500).json({ success: false, error: error.message });
-        }
-    });
-
-    app.post('/api/regions/coordinates', async (req, res) => {
-        try {
-            const { latitude, longitude } = req.body;
-            const locationData = await kijijiService.getLocationFromCoordinates(latitude, longitude);
-            if (locationData) {
-                const formattedLocation = {
-                    id: locationData.id,
-                    locationPaths: locationData.locationPaths,
-                    fullName: locationData.locationPaths?.map(path => path.name).join(', ') || 'Unknown Location'
-                };
-                res.json({ success: true, data: formattedLocation });
-            } else {
-                res.json({ success: false, error: 'Location not found' });
-            }
-        } catch (error) {
-            res.status(500).json({ success: false, error: error.message });
-        }
-    });
-
-    app.post('/api/regions/place', async (req, res) => {
-        try {
-            const { placeId, sessionToken } = req.body;
-            const placeData = await kijijiService.getLocationFromPlace(placeId, sessionToken);
-            if (placeData) {
-                const formattedPlace = {
-                    id: placeData.location.id,
-                    address: placeData.address,
-                    locationPaths: placeData.location.locationPaths,
-                    fullName: placeData.location.locationPaths?.map(path => path.name).join(', ') || placeData.address
-                };
-                res.json({ success: true, data: formattedPlace });
-            } else {
-                res.json({ success: false, error: 'Place not found' });
-            }
         } catch (error) {
             res.status(500).json({ success: false, error: error.message });
         }

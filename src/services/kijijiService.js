@@ -84,14 +84,12 @@ class KijijiService {
         };
         this.categories = [];
         this.regions = [];
-        this.googleMapsKey = null;
     }
 
     async init() {
         console.log('🔄 Initializing Kijiji API data...');
         await this.fetchCategories();
         await this.fetchPopularRegions();
-        await this.getGoogleMapsKey();
         console.log(`✅ Loaded ${this.categories.length} categories and ${this.regions.length} regions`);
     }
 
@@ -170,90 +168,8 @@ class KijijiService {
         }
     }
 
-    async getGoogleMapsKey() {
-        try {
-            const body = {
-                operationName: 'GetGoogleMapsKey',
-                variables: {},
-                query: `mutation GetGoogleMapsKey { getGoogleMapsKey }`
-            };
-            const res = await axios.post(this.baseURL, body, { headers: this.headers });
-            this.googleMapsKey = res.data?.data?.getGoogleMapsKey;
-            console.log('🗺️ Google Maps key fetched');
-        } catch (e) {
-            console.error('❌ Failed to fetch Google Maps key:', e.message);
-        }
-    }
-
-    async getLocationFromCoordinates(latitude, longitude) {
-        try {
-            const body = {
-                operationName: 'GetLocationFromCoordinates',
-                variables: { 
-                    coordinates: { latitude, longitude } 
-                },
-                query: `query GetLocationFromCoordinates($coordinates: LocationQueryCoordsOptions!) { 
-                    locationFromCoordinates(coordinates: $coordinates) { 
-                        location { 
-                            id 
-                            locationPaths { 
-                                id 
-                                name 
-                                __typename 
-                            } 
-                            __typename 
-                        } 
-                        __typename 
-                    } 
-                }`
-            };
-            const res = await axios.post(this.baseURL, body, { headers: this.headers });
-            return res.data?.data?.locationFromCoordinates?.location;
-        } catch (e) {
-            console.error(`❌ Failed to get location from coordinates (${latitude}, ${longitude}):`, e.message);
-            return null;
-        }
-    }
-
-    async getLocationFromPlace(placeId, sessionToken = null) {
-        try {
-            const body = {
-                operationName: 'GetLocationFromPlace',
-                variables: { 
-                    placeId,
-                    sessionToken 
-                },
-                query: `query GetLocationFromPlace($placeId: String!, $sessionToken: String) { 
-                    locationFromPlace(placeId: $placeId, sessionToken: $sessionToken) { 
-                        place { 
-                            id 
-                            address 
-                            location { 
-                                id 
-                                locationPaths { 
-                                    id 
-                                    name 
-                                    __typename 
-                                } 
-                                __typename 
-                            } 
-                            __typename 
-                        } 
-                        __typename 
-                    } 
-                }`
-            };
-            const res = await axios.post(this.baseURL, body, { headers: this.headers });
-            return res.data?.data?.locationFromPlace?.place;
-        } catch (e) {
-            console.error(`❌ Failed to get location from place ID ${placeId}:`, e.message);
-            return null;
-        }
-    }
-
-    async searchLocationByName(query) {
-        // This would require Google Places API integration
-        // For now, we'll search through our cached regions
+    searchLocationByName(query) {
+        // Search through cached regions
         const results = this.regions.filter(region => 
             region.displayName?.toLowerCase().includes(query.toLowerCase()) ||
             region.locationPaths?.some(path => 
@@ -262,23 +178,6 @@ class KijijiService {
         );
         return results;
     }
-
-    async fetchRegions() {
-        try {
-            const body = {
-                operationName: 'GetGeocodeReverseFromIp',
-                variables: {},
-                query: `query GetGeocodeReverseFromIp { geocodeReverseFromIp { city province locationId __typename } }`
-            };
-            const res = await axios.post(this.baseURL, body, { headers: this.headers });
-            // This only gets the current region; for all, you may need to scrape or use a static list
-            this.regions = res.data?.data?.geocodeReverseFromIp ? [res.data.data.geocodeReverseFromIp] : [];
-        } catch (e) {
-            console.error('Failed to fetch regions:', e.message);
-        }
-    }
-
-
 
     async searchListings(searchUrl, limit = 40, offset = 0) {
         try {

@@ -2,6 +2,22 @@ const Scanner = require('./scanner/scanner');
 const { startWebServer } = require('./web/server');
 const chalk = require('chalk');
 
+// Add timestamps to all console output
+const originalLog = console.log;
+const originalError = console.error;
+
+function getTimestamp() {
+    return chalk.gray(`[${new Date().toLocaleTimeString()}]`);
+}
+
+console.log = (...args) => {
+    originalLog(getTimestamp(), ...args);
+};
+
+console.error = (...args) => {
+    originalError(getTimestamp(), ...args);
+};
+
 let scanner = null;
 let webServer = null;
 
