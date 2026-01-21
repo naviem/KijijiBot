@@ -1,11 +1,20 @@
 const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
+const fs = require('fs');
 const config = require('../config/config');
 
 class Database {
     constructor() {
         // Resolve database path relative to project root
         this.dbPath = path.resolve(__dirname, '../..', config.database.path);
+
+        // Ensure the data directory exists
+        const dataDir = path.dirname(this.dbPath);
+        if (!fs.existsSync(dataDir)) {
+            fs.mkdirSync(dataDir, { recursive: true });
+            console.log(`📁 Created data directory: ${dataDir}`);
+        }
+
         this.db = new sqlite3.Database(this.dbPath);
         this.init();
     }
